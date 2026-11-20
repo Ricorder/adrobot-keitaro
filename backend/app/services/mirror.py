@@ -143,7 +143,13 @@ def sync_reference(session: Session, client: KeitaroClient) -> dict[str, int]:
 
 
 def sync_campaigns(session: Session, client: KeitaroClient) -> int:
-    count = 0
+    """Обновляет список кампаний и помечает исчезнувшие.
+
+    iter_campaigns обходит все страницы, поэтому множество id сзади полное: чего нет в этом
+    множестве, того нет и в трекере. Без этого удалённая в Keitaro кампания вечно висела бы
+    в зеркале активной, а редактор предлагал бы её править.
+    """
+    seen: set[int] = set()
     for campaign in client.iter_campaigns():
         _merge(
             session,
@@ -161,9 +167,14 @@ def sync_campaigns(session: Session, client: KeitaroClient) -> int:
                 "fetched_at": datetime.now(UTC),
             },
         )
-        count += 1
+        seen.add(int(campaign["id"]))
+
+    for local in session.scalars(select(Campaign)):
+        if local.id not in seen and local.state != "deleted":
+            local.state = "deleted"
+
     session.flush()
-    return count
+    return len(seen)
 
 
 def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> SyncStats:

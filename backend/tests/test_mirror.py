@@ -235,3 +235,36 @@ def test_groups_are_requested_for_both_types(session: Session) -> None:
 
     mirror.sync_reference(session, make_client(handler))
     assert seen == ["campaigns", "offers"]
+
+
+def test_campaign_deleted_upstream_is_marked_not_left_active(session) -> None:
+    """Удалённая в трекере кампания не должна оставаться в зеркале «активной»."""
+
+    def pages(*ids: int):
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=[campaign_payload(i) for i in ids])
+
+        return handler
+
+    client = make_client(pages(1, 2, 3))
+    assert mirror.sync_campaigns(session, client) == 3
+    session.commit()
+
+    client_after = make_client(pages(1, 3))
+    assert mirror.sync_campaigns(session, client_after) == 2
+    session.commit()
+
+    assert session.get(Campaign, 2).state == "deleted"
+    assert session.get(Campaign, 1).state == "active"
+    assert session.get(Campaign, 3).state == "active"
+
+
+def test_empty_remote_list_marks_everything_deleted(session) -> None:
+    client = make_client(lambda request: httpx.Response(200, json=[campaign_payload(7)]))
+    mirror.sync_campaigns(session, client)
+    session.commit()
+
+    gone = make_client(lambda request: httpx.Response(200, json=[]))
+    assert mirror.sync_campaigns(session, gone) == 0
+    session.commit()
+    assert session.get(Campaign, 7).state == "deleted"
