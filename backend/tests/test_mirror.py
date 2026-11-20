@@ -153,7 +153,7 @@ def test_sync_streams_mirrors_flows_filters_and_offers(session: Session) -> None
     assert geo.schema == "redirect"
     assert geo.action_options == {"url": "https://www.google.com"}
     assert [f.name for f in geo.filters] == ["country"]
-    row = session.get(StreamOffer, 9001)
+    row = session.scalar(select(StreamOffer).where(StreamOffer.link_id == 9001))
     assert row is not None and row.sync_status == SyncStatus.SYNCED and row.share == 100
 
 
@@ -178,7 +178,7 @@ def test_offer_deleted_in_keitaro_turns_grey_not_vanished(session: Session) -> N
     session.commit()
 
     assert stats.removed_externally == 1
-    row = session.get(StreamOffer, 9001)
+    row = session.scalar(select(StreamOffer).where(StreamOffer.link_id == 9001))
     assert row is not None
     assert row.sync_status == SyncStatus.REMOVED_EXTERNALLY
     assert row.share == 0
@@ -199,7 +199,7 @@ def test_offer_back_in_keitaro_is_synced_again(session: Session) -> None:
         500,
     )
     session.commit()
-    row = session.get(StreamOffer, 9001)
+    row = session.scalar(select(StreamOffer).where(StreamOffer.link_id == 9001))
     assert row is not None and row.sync_status == SyncStatus.SYNCED
 
 

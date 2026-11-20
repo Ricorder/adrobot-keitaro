@@ -18,7 +18,9 @@ def make_engine(database_url: str | None = None) -> Engine:
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:
-    return sessionmaker(bind=engine, expire_on_commit=False, future=True)
+    # expire_on_commit по умолчанию (True): после коммита отношения перезагружаются, иначе
+    # редактор видит устаревший список офферов потока и теряет только что добавленную строку.
+    return sessionmaker(bind=engine, future=True)
 
 
 @contextmanager

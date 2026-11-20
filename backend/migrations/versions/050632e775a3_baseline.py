@@ -1,8 +1,8 @@
-"""baseline mirror schema
+"""baseline
 
-Revision ID: ed94807ee5cc
+Revision ID: 050632e775a3
 Revises: 
-Create Date: 2026-11-19 18:35:56.417461
+Create Date: 2026-11-20 12:21:32.185000
 """
 
 from collections.abc import Sequence
@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = 'ed94807ee5cc'
+revision: str = '050632e775a3'
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -129,15 +129,18 @@ def upgrade() -> None:
         batch_op.create_index(batch_op.f('ix_stream_filters_stream_id'), ['stream_id'], unique=False)
 
     op.create_table('stream_offers',
-    sa.Column('id', sa.Integer(), autoincrement=False, nullable=False),
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('link_id', sa.Integer(), nullable=True),
     sa.Column('stream_id', sa.Integer(), nullable=False),
     sa.Column('offer_id', sa.Integer(), nullable=False),
     sa.Column('share', sa.Integer(), nullable=False),
     sa.Column('state', sa.String(length=16), nullable=False),
     sa.Column('sync_status', sa.String(length=32), nullable=False),
     sa.Column('pinned_share', sa.Integer(), nullable=True),
+    sa.Column('position', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['stream_id'], ['streams.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('link_id')
     )
     with op.batch_alter_table('stream_offers', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_stream_offers_offer_id'), ['offer_id'], unique=False)

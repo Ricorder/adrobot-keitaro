@@ -1,11 +1,8 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from sqlalchemy import text
 
-from app.config import Settings
 from app.db.models import Base
-from app.deps import get_app_settings
+from app.deps import SettingsDep
 
 router = APIRouter()
 
@@ -19,7 +16,7 @@ def healthz(request: Request) -> dict:
 
 
 @router.get("/api/meta")
-def meta(settings: Annotated[Settings, Depends(get_app_settings)]) -> dict:
+def meta(settings: SettingsDep) -> dict:
     """Что фронт должен знать о конфигурации: префикс и адрес трекера, но не ключ."""
     return {
         "keitaro_base_url": settings.keitaro_base_url,

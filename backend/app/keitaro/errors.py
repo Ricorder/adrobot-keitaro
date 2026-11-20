@@ -32,5 +32,9 @@ class KeitaroAPIError(KeitaroError):
         super().__init__(f"Keitaro {status} на {path}: {detail}")
 
 
+class KeitaroNotFoundError(KeitaroAPIError):
+    """404: сущности в трекере нет. Отличаем от прочих 4xx, чтобы не путать с отказом."""
+
+
 class KeitaroAuthError(KeitaroAPIError):
     """401/403: ключ не подошёл — повторять бессмысленно."""

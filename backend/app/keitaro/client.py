@@ -20,6 +20,7 @@ from app.keitaro.errors import (
     KeitaroAuthError,
     KeitaroConfigError,
     KeitaroError,
+    KeitaroNotFoundError,
     KeitaroTransportError,
 )
 
@@ -84,7 +85,10 @@ class KeitaroClient:
                 self._sleep(self._backoff(attempt))
                 continue
             if response.status_code >= 400:
-                raise KeitaroAPIError(response.status_code, self._payload(response), path)
+                payload = self._payload(response)
+                if response.status_code == 404:
+                    raise KeitaroNotFoundError(response.status_code, payload, path)
+                raise KeitaroAPIError(response.status_code, payload, path)
 
             if not response.content:
                 return None

@@ -32,7 +32,7 @@ def build_campaign(session: Session, *, campaign_id: int = 1) -> Campaign:
             schema="landings",
             action_type="http",
             offers=[
-                StreamOffer(id=1, offer_id=18813, share=100),
+                StreamOffer(link_id=1, offer_id=18813, share=100),
             ],
         ),
     ]
@@ -51,7 +51,7 @@ def test_added_offer_marks_stream_yellow(session) -> None:
     campaign = build_campaign(session)
     offers_stream = campaign.streams[1]
     offers_stream.offers.append(
-        StreamOffer(id=2, offer_id=18814, share=50, sync_status=SyncStatus.PENDING_ADD)
+        StreamOffer(link_id=2, offer_id=18814, share=50, sync_status=SyncStatus.PENDING_ADD)
     )
     session.flush()
     assert offers_stream.has_unpublished_changes is True

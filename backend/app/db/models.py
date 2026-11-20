@@ -150,17 +150,23 @@ class StreamFilter(Base):
 
 
 class StreamOffer(Base):
-    """Связка поток-оффер: здесь живёт доля (share) и закреплённый вес."""
+    """Связка поток-оффер: здесь живёт доля (share) и закреплённый вес.
+
+    Ключ локальный, id связки из Keitaro хранится отдельно: добавленный в редакторе оффер
+    существует у нас до Push KT, и своего идентификатора у трекера он ещё не имеет.
+    """
 
     __tablename__ = "stream_offers"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    link_id: Mapped[int | None] = mapped_column(Integer, unique=True)
     stream_id: Mapped[int] = mapped_column(ForeignKey("streams.id", ondelete="CASCADE"), index=True)
     offer_id: Mapped[int] = mapped_column(Integer, index=True)
     share: Mapped[int] = mapped_column(Integer, default=100)
     state: Mapped[str] = mapped_column(String(16), default="active")
     sync_status: Mapped[str] = mapped_column(String(32), default=SyncStatus.SYNCED)
     pinned_share: Mapped[int | None] = mapped_column(Integer)
+    position: Mapped[int] = mapped_column(Integer, default=1)
 
     stream: Mapped[Stream] = relationship(back_populates="offers")
 

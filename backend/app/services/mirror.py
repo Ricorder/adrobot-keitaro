@@ -40,6 +40,7 @@ class SyncStats:
     streams: int = 0
     offers_in_streams: int = 0
     removed_externally: int = 0
+    kept_pending: int = 0
     reference: dict[str, int] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
@@ -48,6 +49,7 @@ class SyncStats:
             "streams": self.streams,
             "offers_in_streams": self.offers_in_streams,
             "removed_externally": self.removed_externally,
+            "kept_pending": self.kept_pending,
             "reference": self.reference,
             "at": datetime.now(UTC).isoformat(),
         }
@@ -218,20 +220,50 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
 
         remote_offers = payload.get("offers", [])
         wanted_offer_link_ids = {_id_of(item, "связку поток-оффер") for item in remote_offers}
+        # Жёлтый поток: если здесь есть неопубликованная правка, доли в трекере ещё старые,
+        # и брать их нельзя — иначе повторный F-Streams тихо отменит чужую работу.
+        stream_has_local_edits = any(
+            row.sync_status in (SyncStatus.PENDING_ADD, SyncStatus.PENDING_REMOVE)
+            for row in stream.offers
+        )
         for item in remote_offers:
             link_id = _id_of(item, "связку поток-оффер")
-            link = session.get(StreamOffer, link_id) or StreamOffer(id=link_id)
-            link.stream_id = stream.id
-            link.offer_id = item["offer_id"]
-            link.share = item.get("share", 100)
-            link.state = item.get("state", "active")
-            link.sync_status = SyncStatus.SYNCED
-            if link not in stream.offers:
+            link = session.scalar(select(StreamOffer).where(StreamOffer.link_id == link_id))
+            if link is None:
+                # строка, добавленная в редакторе, прилетает из трекера с новым id:
+                # забираем его, иначе локальная правка навсегда останется «неопубликованной»
+                link = session.scalar(
+                    select(StreamOffer).where(
+                        StreamOffer.stream_id == stream.id,
+                        StreamOffer.offer_id == item["offer_id"],
+                        StreamOffer.link_id.is_(None),
+                        StreamOffer.sync_status == SyncStatus.PENDING_ADD,
+                    )
+                )
+                if link is not None:
+                    link.link_id = link_id
+                    link.sync_status = SyncStatus.SYNCED
+            if link is None:
+                link = StreamOffer(link_id=link_id, stream_id=stream.id)
                 stream.offers.append(link)
+            link.offer_id = item["offer_id"]
+            link.state = item.get("state", "active")
+            if stream_has_local_edits or link.sync_status in (
+                SyncStatus.PENDING_ADD,
+                SyncStatus.PENDING_REMOVE,
+            ):
+                # берём у трекера идентификаторы, но локальные доли оставляем как есть
+                stats.kept_pending += 1
+            else:
+                link.share = item.get("share", 100)
+                link.sync_status = SyncStatus.SYNCED
             stats.offers_in_streams += 1
 
         for link in list(stream.offers):
-            if link.id not in wanted_offer_link_ids and link.sync_status != SyncStatus.PENDING_ADD:
+            if (
+                link.link_id not in wanted_offer_link_ids
+                and link.sync_status != SyncStatus.PENDING_ADD
+            ):
                 link.sync_status = SyncStatus.REMOVED_EXTERNALLY
                 link.share = 0
                 stats.removed_externally += 1

@@ -28,6 +28,7 @@ class FakeKeitaro:
         self.fail_on_stream_position: int | None = None
         self.fail_delete = False
         self.deleted_campaigns: list[int] = []
+        self.put_payloads: list[dict] = []
 
     def _new_id(self) -> int:
         self.next_id += 1
@@ -92,6 +93,35 @@ class FakeKeitaro:
             return httpx.Response(200, json={"id": campaign_id})
         if path.endswith("/campaigns") and request.method == "GET":
             return httpx.Response(200, json=list(self.campaigns.values()))
+        if request.method == "PUT" and "/streams/" in path:
+            stream_id = int(path.rsplit("/", 1)[1])
+            self.put_payloads.append(body)
+            stream = self.streams[stream_id]
+            keep = {o["offer_id"]: o["id"] for o in stream.get("offers", [])}
+            stream["offers"] = [
+                {
+                    **item,
+                    "id": keep.get(item["offer_id"], self._new_id()),
+                    "stream_id": stream_id,
+                }
+                for item in body.get("offers", [])
+            ]
+            for key in (
+                "name",
+                "position",
+                "type",
+                "schema",
+                "action_type",
+                "action_options",
+                "state",
+                "weight",
+                "collect_clicks",
+                "filter_or",
+                "filters",
+            ):
+                if key in body:
+                    stream[key] = body[key]
+            return httpx.Response(200, json={"id": stream_id})
         if request.method == "DELETE" and "/campaigns/" in path:
             campaign_id = int(path.rsplit("/", 1)[1])
             if self.fail_delete:
