@@ -18,7 +18,10 @@ class FakeKeitaro:
         self.campaigns: dict[int, dict] = {}
         self.streams: dict[int, dict] = {}
         self.stream_requests: list[dict] = []
-        self.groups: list[dict] = [{"id": 1, "name": "VZ adrobot test", "type": "campaigns"}]
+        self.groups: list[dict] = [
+            {"id": 1, "name": "VZ adrobot test", "type": "campaigns"},
+            {"id": 10332, "name": "FORTESTS", "type": "campaigns"},
+        ]
         self.sources: list[dict] = [{"id": 2, "name": "FORTESTS"}]
         self.domains: list[dict] = [
             {"id": 1813, "name": "kylovoa.com", "state": "active", "is_ssl": True}
@@ -51,9 +54,9 @@ class FakeKeitaro:
         if path.endswith("/traffic_sources") and request.method == "GET":
             return httpx.Response(200, json=self.sources)
         if path.endswith("/traffic_sources") and request.method == "POST":
-            created = {"id": self._new_id(), "name": body["name"], "state": "active"}
-            self.sources.append(created)
-            return httpx.Response(200, json=created)
+            return httpx.Response(
+                403, json={"error": "You have no permission to access this page - TrafficSources"}
+            )
         if path.endswith("/groups") and request.method == "GET":
             group_type = request.url.params["type"]
             return httpx.Response(200, json=[g for g in self.groups if g["type"] == group_type])
@@ -180,19 +183,41 @@ def test_created_campaign_lands_in_mirror(session: Session) -> None:
     assert {s.schema for s in stored.streams} == {"redirect", "landings"}
 
 
-def test_group_and_source_are_created_once(session: Session) -> None:
+def test_group_and_source_are_reused_not_recreated(session: Session) -> None:
+    """На стенде FORTESTS уже есть: создаватель обязан взять его, а не плодить копии."""
     tracker = FakeKeitaro()
-    create(session, tracker)
-    assert [g["name"] for g in tracker.groups if g["name"].startswith("kolesnikov-")] == [
-        "kolesnikov-group"
-    ]
-    assert [s["name"] for s in tracker.sources if s["name"].startswith("kolesnikov-")] == [
-        "kolesnikov-source"
-    ]
+    before_groups = len(tracker.groups)
+    before_sources = len(tracker.sources)
 
-    create(session, tracker)
-    assert len([g for g in tracker.groups if g["name"] == "kolesnikov-group"]) == 1
-    assert len([s for s in tracker.sources if s["name"] == "kolesnikov-source"]) == 1
+    first = create(session, tracker)
+    second = create(session, tracker, name="Вторая PR")
+
+    assert first.group_id == 10332 and first.traffic_source_id == 2
+    assert second.group_id == 10332
+    assert len(tracker.groups) == before_groups
+    assert len(tracker.sources) == before_sources
+
+
+def test_group_is_created_when_configured_one_is_absent(session: Session) -> None:
+    tracker = FakeKeitaro()
+    tracker.groups = [g for g in tracker.groups if g["name"] != "FORTESTS"]
+    result = create(session, tracker)
+    assert result.group_id > 0
+    assert any(g["name"] == "FORTESTS" for g in tracker.groups)
+
+
+def test_absent_source_is_reported_with_options(session: Session) -> None:
+    """Создать источник нельзя (403), поэтому ошибка должна называть доступные варианты."""
+    tracker = FakeKeitaro()
+    tracker.sources = [
+        {"id": 2, "name": "FORTESTS"},
+        {"id": 3, "name": "Другой"},
+    ]
+    client, settings = make_setup(tracker, session)
+    settings = settings.model_copy(update={"keitaro_source_name": "Нет такой"})
+
+    with pytest.raises(creator.CreatorError, match="закрыто правами"):
+        creator.create_campaign(session, client, settings, name="PR", geo="PE", offer_id=18813)
 
 
 def test_unknown_geo_code_stops_before_any_write(session: Session) -> None:

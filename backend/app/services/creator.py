@@ -29,8 +29,6 @@ from app.services import mirror
 from app.services.geo import normalize_geo
 from app.services.slug import make_alias
 
-GROUP_SUFFIX = "group"
-SOURCE_SUFFIX = "source"
 GEO_SCHEMA = "redirect"
 OFFER_SCHEMA = "landings"
 
@@ -55,20 +53,40 @@ def _existing_by_name(items: list[dict], name: str) -> dict | None:
     return next((item for item in items if item.get("name") == name), None)
 
 
-def _ensure_group(client: KeitaroClient, settings: Settings) -> int:
-    name = f"{settings.keitaro_prefix}{GROUP_SUFFIX}"
+def _resolve_group(client: KeitaroClient, settings: Settings) -> int:
+    """Группу берём существующей по имени из настроек; создание правами API разрешено."""
+    name = settings.keitaro_group_name
     found = _existing_by_name(client.groups("campaigns"), name)
     if found is not None:
         return int(found["id"])
-    return int(client.create_group(name=name, group_type="campaigns")["id"])
+    try:
+        return int(client.create_group(name=name, group_type="campaigns")["id"])
+    except KeitaroAPIError as exc:
+        raise CreatorError(
+            f"группа {name!r} не найдена и не создана: {exc}. "
+            "Укажите в KEITARO_GROUP_NAME существующую группу."
+        ) from exc
 
 
-def _ensure_source(client: KeitaroClient, settings: Settings) -> int:
-    name = f"{settings.keitaro_prefix}{SOURCE_SUFFIX}"
-    found = _existing_by_name(client.traffic_sources(), name)
+def _resolve_source(client: KeitaroClient, settings: Settings) -> int:
+    """Источник только переиспользуется.
+
+    На тестовом стенде POST /traffic_sources отвечает 403 «no permission» — проверено
+    запросом, поэтому пытаться создать источник бессмысленно: вместо этого просим
+    существующий по имени или по одному-единственному доступному.
+    """
+    name = settings.keitaro_source_name
+    sources = client.traffic_sources()
+    found = _existing_by_name(sources, name)
     if found is not None:
         return int(found["id"])
-    return int(client.create_traffic_source(name=name)["id"])
+    if len(sources) == 1:
+        return int(sources[0]["id"])
+    names = ", ".join(sorted(str(s.get("name")) for s in sources)) or "нет ни одного"
+    raise CreatorError(
+        f"источник {name!r} не найден, а создание источников закрыто правами API. "
+        f"Доступные: {names}. Укажите один из них в KEITARO_SOURCE_NAME."
+    )
 
 
 def _pick_domain(client: KeitaroClient, preferred: int | None) -> int:
@@ -251,8 +269,8 @@ def create_campaign(
         session.commit()
         return result
 
-    group_id = _ensure_group(client, settings)
-    source_id = _ensure_source(client, settings)
+    group_id = _resolve_group(client, settings)
+    source_id = _resolve_source(client, settings)
     chosen_domain = _pick_domain(client, domain_id)
     alias = make_alias(clean_name, settings.keitaro_prefix)
 

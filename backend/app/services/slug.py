@@ -66,4 +66,7 @@ def slugify(text: str, *, max_length: int = 40) -> str:
 
 def make_alias(name: str, prefix: str) -> str:
     base = slugify(name) or "campaign"
+    # название у кандидата и так может начинаться с префикса — двойная приставка некрасива
+    if prefix and base.startswith(prefix.rstrip("-").lower()):
+        base = base[len(prefix.rstrip("-").lower()) :].lstrip("-") or base
     return f"{prefix}{base}-{secrets.token_hex(3)}"

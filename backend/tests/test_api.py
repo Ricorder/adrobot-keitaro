@@ -60,6 +60,10 @@ def test_create_campaign_returns_two_flows(api: TestClient, tracker: FakeKeitaro
     assert geo_flow["filters"] == [{"name": "country", "mode": "accept", "payload": ["PE"]}]
     assert [o["share"] for o in offer_flow["offers"]] == [100]
     assert offer_flow["yellow"] is False
+    assert offer_flow["unassigned_percent"] == 0
+    # у редирект-потока офферов нет по замыслу: «не распределено» должно быть нулём, а не 100
+    assert geo_flow["unassigned_percent"] == 0
+    assert geo_flow["offers"] == []
 
 
 def test_create_validates_geo_and_offer(api: TestClient) -> None:

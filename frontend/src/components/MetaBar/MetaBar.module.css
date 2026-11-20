@@ -1,0 +1,40 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.chip {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 12px;
+}
+
+.label {
+  color: var(--color-muted);
+  text-transform: lowercase;
+}
+
+.value {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.ok {
+  color: var(--color-ok);
+}
+
+.warn {
+  color: var(--color-warn);
+}

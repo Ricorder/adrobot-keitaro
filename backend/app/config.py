@@ -30,6 +30,14 @@ class Settings(BaseSettings):
         default="kolesnikov-",
         description="Префикс кампаний, групп и офферов: стенд общий с другими кандидатами",
     )
+    keitaro_group_name: str = Field(
+        default="FORTESTS",
+        description="Группа кампаний: берётся существующей, при отсутствии создаётся с этим именем",
+    )
+    keitaro_source_name: str = Field(
+        default="FORTESTS",
+        description="Источник трафика: только переиспользуется, создание закрыто правами API",
+    )
     keitaro_timeout_seconds: float = Field(default=15.0)
     keitaro_max_retries: int = Field(default=3, description="Повторы только сетевых ошибок и 5xx")
     google_redirect_url: str = Field(default="https://www.google.com")

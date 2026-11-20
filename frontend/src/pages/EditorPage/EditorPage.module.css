@@ -1,0 +1,140 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.side,
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: 16px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.search {
+  width: 100%;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-2);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.check {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.checkInput {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-accent);
+}
+
+.note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+
+.sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+.alias {
+  font-family: var(--mono);
+  color: var(--color-accent);
+}
+
+.badge {
+  padding: 0 7px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.streams {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.empty {
+  margin: 0;
+  padding: 22px 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,136 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(320px, 460px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.form,
+.side {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: 18px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 620;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.input {
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-2);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.geo {
+  composes: input;
+  width: 110px;
+  text-transform: uppercase;
+  font-family: var(--mono);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.picked {
+  font-size: 12px;
+  color: var(--color-ok);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.linkRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.linkValue {
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.caption {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.idLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+}
+
+.alias {
+  font-family: var(--mono);
+  color: var(--color-accent);
+}
+
+@media (max-width: 900px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+}

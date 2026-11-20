@@ -31,6 +31,9 @@ def _offer_rows(session: Session, stream: Stream) -> list[OfferRowView]:
 def _stream_view(session: Session, stream: Stream) -> StreamView:
     rows = _offer_rows(session, stream)
     active = [r for r in rows if r.sync_status != SyncStatus.PENDING_REMOVE]
+    # «не распределено» осмысленно только там, где поток раздаёт офферы: в редирект-потоке
+    # офферов нет по замыслу, и 100 % свободного места там было бы выдумкой
+    unassigned = max(0, 100 - sum(r.share for r in active)) if rows else 0
     return StreamView(
         id=stream.id,
         name=stream.name,
@@ -40,7 +43,7 @@ def _stream_view(session: Session, stream: Stream) -> StreamView:
         action_options=stream.action_options,
         state=stream.state,
         yellow=stream.has_unpublished_changes,
-        unassigned_percent=max(0, 100 - sum(r.share for r in active)),
+        unassigned_percent=unassigned,
         filters=[FilterView(name=f.name, mode=f.mode, payload=f.payload) for f in stream.filters],
         offers=rows,
     )
