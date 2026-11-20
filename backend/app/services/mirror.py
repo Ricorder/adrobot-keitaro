@@ -53,6 +53,17 @@ class SyncStats:
         }
 
 
+class KeitaroShapeError(RuntimeError):
+    """В ответе Keitaro нет ожидаемого id. Молча записывать такое в зеркало нельзя."""
+
+
+def _id_of(item: dict[str, Any], what: str) -> int:
+    value = item.get("id")
+    if value is None:
+        raise KeitaroShapeError(f"Keitaro вернул {what} без id: {item}")
+    return int(value)
+
+
 def _merge(session: Session, model: Any, primary: str, values: dict[str, Any]) -> None:
     """Вставляет строку или обновляет существующую по первичному ключу."""
     instance = session.get(model, values[primary])
@@ -157,7 +168,7 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
     """Потоки одной кампании: обновляет зеркало и находит удалённые в Keitaro офферы."""
     stats = SyncStats()
     remote = client.streams(campaign_id)
-    remote_stream_ids = {stream["id"] for stream in remote}
+    remote_stream_ids = {_id_of(stream, "поток") for stream in remote}
     now = datetime.now(UTC)
 
     known_streams = list(session.scalars(select(Stream).where(Stream.campaign_id == campaign_id)))
@@ -169,7 +180,8 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
     session.flush()
 
     for payload in remote:
-        stream = session.get(Stream, payload["id"]) or Stream(id=payload["id"])
+        stream_id = _id_of(payload, "поток")
+        stream = session.get(Stream, stream_id) or Stream(id=stream_id)
         stream.campaign_id = payload["campaign_id"]
         stream.name = payload.get("name")
         stream.position = payload.get("position", 1)
@@ -185,14 +197,15 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
         if stream not in known_streams:
             session.add(stream)
 
-        wanted_filter_ids = {item["id"] for item in payload.get("filters", [])}
-        for item in payload.get("filters", []):
+        filters = payload.get("filters", [])
+        wanted_filter_ids = {_id_of(item, "фильтр") for item in filters}
+        for item in filters:
             _merge(
                 session,
                 StreamFilter,
                 "id",
                 {
-                    "id": item["id"],
+                    "id": _id_of(item, "фильтр"),
                     "stream_id": stream.id,
                     "name": item["name"],
                     "mode": item["mode"],
@@ -204,9 +217,10 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
                 session.delete(stale_filter)
 
         remote_offers = payload.get("offers", [])
-        wanted_offer_link_ids = {item["id"] for item in remote_offers}
+        wanted_offer_link_ids = {_id_of(item, "связку поток-оффер") for item in remote_offers}
         for item in remote_offers:
-            link = session.get(StreamOffer, item["id"]) or StreamOffer(id=item["id"])
+            link_id = _id_of(item, "связку поток-оффер")
+            link = session.get(StreamOffer, link_id) or StreamOffer(id=link_id)
             link.stream_id = stream.id
             link.offer_id = item["offer_id"]
             link.share = item.get("share", 100)

@@ -161,6 +161,12 @@ class KeitaroClient:
     def create_stream(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request("POST", "/streams", json_body=payload)
 
+    def create_group(self, *, name: str, group_type: str) -> dict[str, Any]:
+        return self._request("POST", "/groups", json_body={"name": name, "type": group_type})
+
+    def create_traffic_source(self, *, name: str) -> dict[str, Any]:
+        return self._request("POST", "/traffic_sources", json_body={"name": name})
+
     def update_stream(self, stream_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         return self._request("PUT", f"/streams/{stream_id}", json_body=payload)
 
