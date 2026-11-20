@@ -1,0 +1,22 @@
+# секреты и локальная база
+.env
+.env.local
+*.db
+*.sqlite3
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# node
+node_modules/
+frontend/dist/
+.vite/
+
+# прочее
+.DS_Store
