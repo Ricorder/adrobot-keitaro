@@ -125,14 +125,39 @@ def test_remove_offer_zeroes_it_and_rebalances(session, three_offers) -> None:
     assert {v.share for v in editor.offer_view(session, 402) if v.grey} == {0}
 
 
-def test_removing_unpublished_offer_deletes_row_without_remote_call(session, three_offers) -> None:
+def test_removing_unpublished_offer_greys_it_without_remote_call(session, three_offers) -> None:
+    """Не отправленный в трекер оффер ведёт себя как обычный: сереет и возвращается Back."""
     client = setup(session, three_offers)
     editor.add_offer(session, client, 402, 14)
     added = row_of(session, 14)
 
     editor.remove_offer(session, added.id)
-    assert session.get(StreamOffer, added.id) is None
+    assert session.get(StreamOffer, added.id) is not None
+    assert added.sync_status == SyncStatus.PENDING_REMOVE
+    assert added.share == 0
     assert three_offers.put_payloads == []
+
+    editor.restore_offer(session, added.id)
+    assert added.sync_status == SyncStatus.PENDING_ADD
+    assert added.share > 0
+
+
+def test_push_drops_rows_marked_for_removal(session, three_offers) -> None:
+    """Помеченная строка не улетает в трекер и после публикации исчезает из зеркала."""
+    client = setup(session, three_offers)
+    editor.add_offer(session, client, 402, 14)
+    added = row_of(session, 14)
+    editor.remove_offer(session, added.id)
+
+    editor.push_stream(session, client, 402)
+
+    # сверяем по офферу, а не по id строки: после удаления SQLite переиспользует ключ
+    remaining = session.scalars(select(StreamOffer).where(StreamOffer.stream_id == 402)).all()
+    assert sorted(row.offer_id for row in remaining) == [11, 12, 13]
+    assert all(row.link_id is not None for row in remaining)
+    sent = three_offers.put_payloads[-1]["offers"]
+    assert sorted(item["offer_id"] for item in sent) == [11, 12, 13]
+    assert sum(item["share"] for item in sent) == 100
 
 
 def test_back_returns_the_removed_offer(session, three_offers) -> None:
@@ -222,3 +247,20 @@ def test_unknown_offer_id_is_reported(session, three_offers) -> None:
     client = setup(session, three_offers)
     with pytest.raises(editor.EditorError, match="не найден"):
         editor.add_offer(session, client, 402, 900001)
+
+
+def test_push_keeps_row_identity_when_tracker_reissues_link_ids(session, three_offers) -> None:
+    """Регрессия: PUT перевыпускает id связок, зеркало должно опознать свои строки по офферу.
+
+    Без этого после каждой публикации поток выглядел так, будто все офферы удалили в трекере
+    (серые строки) и добавили заново (новые строки с теми же офферами).
+    """
+    client = setup(session, three_offers)
+    editor.add_offer(session, client, 402, 14)
+    editor.push_stream(session, client, 402)
+
+    rows = session.scalars(select(StreamOffer).where(StreamOffer.stream_id == 402)).all()
+    assert sorted(row.offer_id for row in rows) == [11, 12, 13, 14]
+    assert all(row.sync_status == SyncStatus.SYNCED for row in rows)
+    assert all(row.link_id is not None for row in rows)
+    assert sum(row.share for row in rows) == 100

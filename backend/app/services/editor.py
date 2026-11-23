@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Offer, Stream, StreamOffer, SyncStatus
@@ -120,11 +120,9 @@ def remove_offer(session: Session, row_id: int) -> None:
     row = session.get(StreamOffer, row_id)
     if row is None:
         raise EditorError(f"строка {row_id} не найдена")
-    if row.sync_status == SyncStatus.PENDING_ADD:
-        # оффер ещё не опубликован: в трекере удалять нечего, снимаем строку
-        session.delete(row)
-    else:
-        row.sync_status = SyncStatus.PENDING_REMOVE
+    # Помечаем, а не удаляем сразу: и опубликованный, и ещё не отправленный в трекер оффер
+    # должен сереть и возвращаться кнопкой Back. Из зеркала строка уйдёт после Push KT.
+    row.sync_status = SyncStatus.PENDING_REMOVE
     _apply_shares(row.stream)
     session.commit()
 
@@ -134,7 +132,8 @@ def restore_offer(session: Session, row_id: int) -> None:
     if row is None:
         raise EditorError(f"строка {row_id} не найдена")
     if row.sync_status == SyncStatus.PENDING_REMOVE:
-        row.sync_status = SyncStatus.SYNCED
+        # строка без link_id в трекере никогда не существовала — возвращаем её как новую
+        row.sync_status = SyncStatus.SYNCED if row.link_id is not None else SyncStatus.PENDING_ADD
     elif row.sync_status == SyncStatus.REMOVED_EXTERNALLY:
         # в трекере связки уже нет: вернём её как новое добавление с новым id
         row.sync_status = SyncStatus.PENDING_ADD
@@ -193,8 +192,17 @@ def push_stream(session: Session, client: KeitaroClient, stream_id: int) -> mirr
     except KeitaroAPIError as exc:
         raise EditorError(f"Keitaro не принял поток {stream.id}: {exc}") from exc
 
-    for row in [r for r in rows if r.sync_status == SyncStatus.PENDING_REMOVE]:
-        session.delete(row)
+    # опубликованные строки больше не «черновик»: снимаем статус здесь, а не в зеркале,
+    # иначе обычное F-Streams перестало бы защищать несохранённые правки
+    for row in live_rows:
+        row.sync_status = SyncStatus.SYNCED
+
+    # Удаляем bulk-запросом: session.delete() для строки, которая ещё лежит в загруженной
+    # коллекции родителя с delete-orphan, откатывается обратно при flush.
+    doomed = [row.id for row in rows if row.sync_status == SyncStatus.PENDING_REMOVE]
+    if doomed:
+        session.execute(delete(StreamOffer).where(StreamOffer.id.in_(doomed)))
+        session.expire_all()
     session.commit()
 
     return mirror.sync_streams(session, client, stream.campaign_id)

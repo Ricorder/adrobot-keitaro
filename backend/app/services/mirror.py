@@ -231,33 +231,38 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
 
         remote_offers = payload.get("offers", [])
         wanted_offer_link_ids = {_id_of(item, "связку поток-оффер") for item in remote_offers}
+        # Строки берём свежим запросом, а не из stream.offers: в коллекции могут остаться
+        # только что удалённые объекты, а запись в такой объект воскрешает его в сессии.
+        session.flush()
+        existing_rows = list(
+            session.scalars(select(StreamOffer).where(StreamOffer.stream_id == stream.id))
+        )
         # Жёлтый поток: если здесь есть неопубликованная правка, доли в трекере ещё старые,
         # и брать их нельзя — иначе повторный F-Streams тихо отменит чужую работу.
         stream_has_local_edits = any(
             row.sync_status in (SyncStatus.PENDING_ADD, SyncStatus.PENDING_REMOVE)
-            for row in stream.offers
+            for row in existing_rows
         )
         for item in remote_offers:
             link_id = _id_of(item, "связку поток-оффер")
+            offer_id = int(item["offer_id"])
             link = session.scalar(select(StreamOffer).where(StreamOffer.link_id == link_id))
             if link is None:
-                # строка, добавленная в редакторе, прилетает из трекера с новым id:
-                # забираем его, иначе локальная правка навсегда останется «неопубликованной»
+                # Трекер может выдать связке новый id (при PUT или для строки, добавленной
+                # в редакторе). Ищем свою по потоку и офферу: дубль одной пары поток-оффер
+                # редактор создать не даёт, поэтому совпадение однозначное.
                 link = session.scalar(
                     select(StreamOffer).where(
                         StreamOffer.stream_id == stream.id,
-                        StreamOffer.offer_id == item["offer_id"],
-                        StreamOffer.link_id.is_(None),
-                        StreamOffer.sync_status == SyncStatus.PENDING_ADD,
+                        StreamOffer.offer_id == offer_id,
                     )
                 )
                 if link is not None:
                     link.link_id = link_id
-                    link.sync_status = SyncStatus.SYNCED
             if link is None:
                 link = StreamOffer(link_id=link_id, stream_id=stream.id)
-                stream.offers.append(link)
-            link.offer_id = item["offer_id"]
+                session.add(link)
+            link.offer_id = offer_id
             link.state = item.get("state", "active")
             if stream_has_local_edits or link.sync_status in (
                 SyncStatus.PENDING_ADD,
@@ -270,7 +275,7 @@ def sync_streams(session: Session, client: KeitaroClient, campaign_id: int) -> S
                 link.sync_status = SyncStatus.SYNCED
             stats.offers_in_streams += 1
 
-        for link in list(stream.offers):
+        for link in existing_rows:
             if (
                 link.link_id not in wanted_offer_link_ids
                 and link.sync_status != SyncStatus.PENDING_ADD
