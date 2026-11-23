@@ -16,7 +16,7 @@ CJK_RANGES = (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIRS = ("backend/app", "backend/tests", "frontend/src")
-SOURCE_FILES = ("README.md",)
+SOURCE_FILES = ("README.md", "DEMO.md")
 SOURCE_PATTERNS = ("*.py", "*.ts", "*.tsx", "*.css", "*.html", "*.md")
 
 
@@ -52,4 +52,5 @@ def test_hygiene_actually_scans_something() -> None:
     """Без этой проверки тест мог бы тихо перестать видеть файлы после переезда каталогов."""
     found = _collect_files()
     assert len(found) > 30, f"гигиена текста сканирует только {len(found)} файлов"
-    assert any(f.name == "README.md" for f in found), "README не попадает в проверку"
+    names = {f.name for f in found}
+    assert {"README.md", "DEMO.md"} <= names, "документация не попадает в проверку"
